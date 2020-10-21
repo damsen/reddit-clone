@@ -1,0 +1,20 @@
+spring:
+  security:
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            issuer-uri: http://localhost:8080/auth/realms/reddit-clone
+        registration:
+          keycloak:
+            client-id: reddit-service
+            client-secret: 2debecfd-ced1-423e-8d22-f88d83c1641e
+            authorization-grant-type: password
+#            authorization-grant-type: client_credentials
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/auth/realms/reddit-clone
+
+logging:
+  level:
+    root: debug

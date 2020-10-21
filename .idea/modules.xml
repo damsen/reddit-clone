@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/comment-service/comment-service.iml" filepath="$PROJECT_DIR$/comment-service/comment-service.iml" />
+      <module fileurl="file://$PROJECT_DIR$/post-service/post-service.iml" filepath="$PROJECT_DIR$/post-service/post-service.iml" />
+      <module fileurl="file://$PROJECT_DIR$/reddit-clone.iml" filepath="$PROJECT_DIR$/reddit-clone.iml" />
+      <module fileurl="file://$PROJECT_DIR$/subreddit-service/subreddit-service.iml" filepath="$PROJECT_DIR$/subreddit-service/subreddit-service.iml" />
+      <module fileurl="file://$PROJECT_DIR$/user-service/user-service.iml" filepath="$PROJECT_DIR$/user-service/user-service.iml" />
+    </modules>
+  </component>
+</project>

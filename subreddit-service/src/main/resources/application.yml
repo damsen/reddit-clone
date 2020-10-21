@@ -1,0 +1,18 @@
+spring:
+  rsocket:
+    server:
+      port: 7000
+  data:
+    mongodb:
+      host: localhost
+      port: 27017
+      database: reddit-clone
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/auth/realms/reddit-clone
+
+logging:
+  level:
+    root: info
