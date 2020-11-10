@@ -16,7 +16,7 @@ public class CustomVoteRepositoryImpl implements CustomVoteRepository {
     private final ReactiveMongoOperations mongoOps;
 
     @Override
-    public Mono<Score> calculateCommentScoreFromVotes(String commentId) {
+    public Mono<Score> calculateScoreByCommentId(String commentId) {
         return mongoOps.aggregate(
                 newAggregation(
                         match(where("commentId").is(commentId)),

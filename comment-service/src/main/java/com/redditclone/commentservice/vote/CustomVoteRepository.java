@@ -4,5 +4,5 @@ import reactor.core.publisher.Mono;
 
 public interface CustomVoteRepository {
 
-    Mono<Score> calculateCommentScoreFromVotes(String commentId);
+    Mono<Score> calculateScoreByCommentId(String commentId);
 }

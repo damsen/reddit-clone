@@ -1,7 +1,6 @@
 package com.redditclone.commentservice.comment;
 
-import com.redditclone.commentservice.vote.Vote;
-import com.redditclone.commentservice.vote.VoteRepository;
+import com.redditclone.commentservice.vote.VoteService;
 import com.redditclone.commentservice.vote.VoteType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -15,7 +14,7 @@ import reactor.core.publisher.Mono;
 public class CommentService {
 
     private final CommentRepository commentRepo;
-    private final VoteRepository voteRepo;
+    private final VoteService voteService;
 
     public Flux<CommentTree> findCommentsByPostId(String postId, CommentRequest request) {
         Pageable pageable = request.toPageable();
@@ -41,14 +40,15 @@ public class CommentService {
     public Mono<Comment> createComment(String username, CreateComment create) {
         return commentRepo
                 .insert(Comment.of(create.getPostId(), create.getParentId(), username, create.getBody()))
-                .flatMap(comment -> voteRepo.save(Vote.of(comment.getCommentId(), comment.getAuthor(), VoteType.UPVOTE))
+                .flatMap(comment -> voteService
+                        .voteComment(comment.getCommentId(), VoteType.UPVOTE,  comment.getAuthor())
                         .then(Mono.defer(() -> updateCommentScore(comment)))
                         .thenReturn(comment));
     }
 
     private Mono<Comment> updateCommentScore(Comment comment) {
-        return voteRepo
-                .calculateCommentScoreFromVotes(comment.getCommentId())
+        return voteService
+                .calculateScoreByCommentId(comment.getCommentId())
                 .map(comment::updateScoreWith)
                 .flatMap(commentRepo::save);
     }
@@ -78,19 +78,10 @@ public class CommentService {
 
     public Mono<Void> voteComment(String commentId, VoteType voteType, String username) {
         return findCommentById(commentId)
-                .flatMap(comment -> voteRepo
-                        .findVoteByCommentIdAndUsername(comment.getCommentId(), username)
-                        .flatMap(vote -> overrideVoteIfOppositeTypeOrDeleteIfSameType(vote, voteType))
-                        .switchIfEmpty(Mono.defer(() -> voteRepo.insert(Vote.of(comment.getCommentId(), username, voteType))))
+                .flatMap(comment -> voteService
+                        .voteComment(comment.getCommentId(), voteType, username)
                         .then(Mono.defer(() -> updateCommentScore(comment))))
                 .then();
     }
 
-    private Mono<Vote> overrideVoteIfOppositeTypeOrDeleteIfSameType(Vote vote, VoteType voteType) {
-        return Mono.just(vote)
-                .filter(it -> it.getVoteType().equals(voteType.opposite()))
-                .doOnNext(it -> it.setVoteType(voteType))
-                .flatMap(voteRepo::save)
-                .switchIfEmpty(Mono.defer(() -> voteRepo.delete(vote).thenReturn(vote)));
-    }
 }

@@ -8,7 +8,7 @@ spring:
         registration:
           keycloak:
             client-id: reddit-service
-            client-secret: 2debecfd-ced1-423e-8d22-f88d83c1641e
+            client-secret: b7dd0b14-8009-4a2b-ae00-34b591b13ac1
             authorization-grant-type: password
       #            authorization-grant-type: client_credentials
       resourceserver:
