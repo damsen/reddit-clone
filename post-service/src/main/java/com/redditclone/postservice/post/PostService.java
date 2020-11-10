@@ -1,7 +1,6 @@
 package com.redditclone.postservice.post;
 
-import com.redditclone.postservice.vote.Vote;
-import com.redditclone.postservice.vote.VoteRepository;
+import com.redditclone.postservice.vote.VoteService;
 import com.redditclone.postservice.vote.VoteType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,7 +12,7 @@ import reactor.core.publisher.Mono;
 public class PostService {
 
     private final PostRepository postRepo;
-    private final VoteRepository voteRepo;
+    private final VoteService voteService;
 
     public Mono<Post> findPostById(String postId) {
         return postRepo
@@ -32,15 +31,15 @@ public class PostService {
     public Mono<Post> createPost(String username, CreatePost create) {
         return postRepo
                 .insert(Post.of(create.getSubredditName(), username, create.getTitle(), create.getBody()))
-                .flatMap(post -> voteRepo
-                        .save(Vote.of(post.getPostId(), post.getAuthor(), VoteType.UPVOTE))
+                .flatMap(post -> voteService
+                        .votePost(post.getPostId(), VoteType.UPVOTE, post.getAuthor())
                         .then(Mono.defer(() -> updatePostScore(post)))
                         .thenReturn(post));
     }
 
     private Mono<Post> updatePostScore(Post post) {
-        return voteRepo
-                .calculatePostScoreFromVotes(post.getPostId())
+        return voteService
+                .calculateScoreByPostId(post.getPostId())
                 .map(post::updateScoreWith)
                 .flatMap(postRepo::save);
     }
@@ -64,20 +63,10 @@ public class PostService {
 
     public Mono<Void> votePost(String postId, VoteType voteType, String username) {
         return findPostById(postId)
-                .flatMap(post -> voteRepo
-                        .findVoteByPostIdAndUsername(post.getPostId(), username)
-                        .flatMap(vote -> overrideVoteIfOppositeTypeOrDeleteIfSameType(vote, voteType))
-                        .switchIfEmpty(Mono.defer(() -> voteRepo.insert(Vote.of(post.getPostId(), username, voteType))))
+                .flatMap(post -> voteService
+                        .votePost(post.getPostId(), voteType, username)
                         .then(Mono.defer(() -> updatePostScore(post))))
                 .then();
-    }
-
-    private Mono<Vote> overrideVoteIfOppositeTypeOrDeleteIfSameType(Vote vote, VoteType voteType) {
-        return Mono.just(vote)
-                .filter(it -> it.getVoteType().equals(voteType.opposite()))
-                .doOnNext(it -> it.setVoteType(voteType))
-                .flatMap(voteRepo::save)
-                .switchIfEmpty(Mono.defer(() -> voteRepo.delete(vote).thenReturn(vote)));
     }
 
 }
