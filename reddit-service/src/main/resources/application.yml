@@ -1,0 +1,37 @@
+server:
+  port: 9000
+  shutdown: graceful
+
+logging:
+  level:
+    root: info
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: local
+  security:
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            issuer-uri: http://localhost:8080/auth/realms/reddit-clone
+        registration:
+          keycloak:
+            client-id: reddit-service
+            client-secret: 81196896-80bd-41e3-97e6-3556feeef577
+            authorization-grant-type: client_credentials
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/auth/realms/reddit-clone
+
+routes:
+  subreddit-service:
+    host: localhost
+    port: 7000
+
+oauth2:
+  client:
+    registration-id: keycloak

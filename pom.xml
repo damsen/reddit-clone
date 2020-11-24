@@ -14,6 +14,7 @@
         <module>post-service</module>
         <module>subreddit-service</module>
         <module>user-service</module>
+        <module>reddit-service</module>
     </modules>
 
 </project>
