@@ -5,7 +5,7 @@ import lombok.Value;
 @Value
 public class Score {
 
-    Long score;
+    long score;
 
     public static Score withScoreZero() {
         return new Score(0L);

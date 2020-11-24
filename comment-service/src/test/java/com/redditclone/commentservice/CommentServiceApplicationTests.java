@@ -34,8 +34,8 @@ import java.time.Month;
 import java.time.ZoneOffset;
 import java.util.function.Consumer;
 
-@SpringBootTest("spring.rsocket.server.port=0")
-class CommentServiceApplicationTests {
+@SpringBootTest
+public class CommentServiceApplicationTests {
 
     @LocalRSocketServerPort
     private int port;
@@ -58,11 +58,11 @@ class CommentServiceApplicationTests {
         voteRepo.deleteAll().block();
     }
 
-    private Mono<RSocketRequester> connectTcp() {
+    private RSocketRequester tcp() {
         return requesterBuilder
                 .dataMimeType(MediaType.APPLICATION_CBOR)
                 .rsocketStrategies(configurer -> configurer.encoder(new BearerTokenAuthenticationEncoder()))
-                .connectTcp("localhost", port);
+                .tcp("localhost", port);
     }
 
     @Test
@@ -76,11 +76,9 @@ class CommentServiceApplicationTests {
         Comment root2 = commentRepo.save(Comment.of("post1", null, "user6", "body6")).block();
         Comment root3 = commentRepo.save(Comment.of("post2", null, "user7", "body7")).block();
 
-        Flux<CommentTree> comments = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.comments.post.{postId}", "post1")
+        Flux<CommentTree> comments = tcp().route("find.comments.post.{postId}", "post1")
                         .data(CommentRequest.builder().build())
-                        .retrieveFlux(CommentTree.class));
+                        .retrieveFlux(CommentTree.class);
 
         StepVerifier
                 .create(comments)
@@ -105,11 +103,9 @@ class CommentServiceApplicationTests {
         commentRepo.save(Comment.of("post2", null, "user2", "body2")).block();
         commentRepo.save(Comment.of("post2", null, "user3", "body3")).block();
 
-        Flux<CommentTree> comments = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.comments.post.{postId}", "post2")
+        Flux<CommentTree> comments = tcp().route("find.comments.post.{postId}", "post2")
                         .data(CommentRequest.builder().page(1).size(1).build())
-                        .retrieveFlux(CommentTree.class));
+                        .retrieveFlux(CommentTree.class);
 
         StepVerifier
                 .create(comments)
@@ -146,11 +142,9 @@ class CommentServiceApplicationTests {
         middleChild.setCommented(LocalDate.of(2020, Month.AUGUST, 1).atStartOfDay().toInstant(ZoneOffset.UTC));
         commentRepo.save(middleChild).block();
 
-        Flux<CommentTree> comments = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.comments.post.{postId}", "post2")
+        Flux<CommentTree> comments = tcp().route("find.comments.post.{postId}", "post2")
                         .data(CommentRequest.builder().sort(CommentRequest.SortBy.NEW).build())
-                        .retrieveFlux(CommentTree.class));
+                        .retrieveFlux(CommentTree.class);
 
         StepVerifier
                 .create(comments)
@@ -190,11 +184,9 @@ class CommentServiceApplicationTests {
         middleChild.setCommented(LocalDate.of(2020, Month.AUGUST, 1).atStartOfDay().toInstant(ZoneOffset.UTC));
         commentRepo.save(middleChild).block();
 
-        Flux<CommentTree> comments = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.comments.post.{postId}", "post2")
+        Flux<CommentTree> comments = tcp().route("find.comments.post.{postId}", "post2")
                         .data(CommentRequest.builder().sort(CommentRequest.SortBy.OLD).build())
-                        .retrieveFlux(CommentTree.class));
+                        .retrieveFlux(CommentTree.class);
 
         StepVerifier
                 .create(comments)
@@ -234,11 +226,9 @@ class CommentServiceApplicationTests {
         middleChild.setScore(20L);
         commentRepo.save(middleChild).block();
 
-        Flux<CommentTree> comments = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.comments.post.{postId}", "post2")
+        Flux<CommentTree> comments = tcp().route("find.comments.post.{postId}", "post2")
                         .data(CommentRequest.builder().sort(CommentRequest.SortBy.TOP).build())
-                        .retrieveFlux(CommentTree.class));
+                        .retrieveFlux(CommentTree.class);
 
         StepVerifier
                 .create(comments)
@@ -258,11 +248,9 @@ class CommentServiceApplicationTests {
         Comment c2 = commentRepo.save(Comment.of("post2", null, "user2", "body2")).block();
         commentRepo.save(Comment.of("post2", c2.getCommentId(), "user1", "body3")).block();
 
-        Flux<Comment> comments = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.comments.user.{username}", "user1")
+        Flux<Comment> comments = tcp().route("find.comments.user.{username}", "user1")
                         .data(CommentRequest.builder().page(1).size(1).build())
-                        .retrieveFlux(Comment.class));
+                        .retrieveFlux(Comment.class);
 
         StepVerifier
                 .create(comments)
@@ -288,11 +276,9 @@ class CommentServiceApplicationTests {
         middle.setCommented(LocalDate.of(2020, Month.MARCH, 1).atStartOfDay().toInstant(ZoneOffset.UTC));
         commentRepo.save(middle).block();
 
-        Flux<Comment> comments = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.comments.user.{username}", "user1")
+        Flux<Comment> comments = tcp().route("find.comments.user.{username}", "user1")
                         .data(CommentRequest.builder().sort(CommentRequest.SortBy.NEW).build())
-                        .retrieveFlux(Comment.class));
+                        .retrieveFlux(Comment.class);
 
         StepVerifier
                 .create(comments)
@@ -317,11 +303,9 @@ class CommentServiceApplicationTests {
         middle.setCommented(LocalDate.of(2020, Month.MARCH, 1).atStartOfDay().toInstant(ZoneOffset.UTC));
         commentRepo.save(middle).block();
 
-        Flux<Comment> comments = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.comments.user.{username}", "user1")
+        Flux<Comment> comments = tcp().route("find.comments.user.{username}", "user1")
                         .data(CommentRequest.builder().sort(CommentRequest.SortBy.OLD).build())
-                        .retrieveFlux(Comment.class));
+                        .retrieveFlux(Comment.class);
 
         StepVerifier
                 .create(comments)
@@ -346,11 +330,9 @@ class CommentServiceApplicationTests {
         middle.setScore(32L);
         commentRepo.save(middle).block();
 
-        Flux<Comment> comments = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.comments.user.{username}", "user1")
+        Flux<Comment> comments = tcp().route("find.comments.user.{username}", "user1")
                         .data(CommentRequest.builder().sort(CommentRequest.SortBy.TOP).build())
-                        .retrieveFlux(Comment.class));
+                        .retrieveFlux(Comment.class);
 
         StepVerifier
                 .create(comments)
@@ -363,11 +345,9 @@ class CommentServiceApplicationTests {
     @Test
     public void createComment_whenNoJwt_shouldReturnError() {
 
-        Mono<Comment> created = connectTcp()
-                .flatMap(req -> req
-                        .route("create.comment")
+        Mono<Comment> created = tcp().route("create.comment")
                         .data(new CreateComment("post", null, "body"))
-                        .retrieveMono(Comment.class));
+                        .retrieveMono(Comment.class);
 
         StepVerifier
                 .create(created)
@@ -379,12 +359,10 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Comment> created = connectTcp()
-                .flatMap(req -> req
-                        .route("create.comment")
+        Mono<Comment> created = tcp().route("create.comment")
                         .metadata(oAuth2.addTokenToMetadata(token))
                         .data(new CreateComment("post", null, "body"))
-                        .retrieveMono(Comment.class));
+                        .retrieveMono(Comment.class);
 
         StepVerifier
                 .create(created)
@@ -402,12 +380,10 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Comment> created = connectTcp()
-                .flatMap(req -> req
-                        .route("create.comment")
+        Mono<Comment> created = tcp().route("create.comment")
                         .metadata(oAuth2.addTokenToMetadata(token))
                         .data(new CreateComment("post", parentId, "body"))
-                        .retrieveMono(Comment.class));
+                        .retrieveMono(Comment.class);
 
         StepVerifier
                 .create(created)
@@ -423,12 +399,10 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Vote> vote = connectTcp()
-                .flatMap(req -> req
-                        .route("create.comment")
+        Mono<Vote> vote = tcp().route("create.comment")
                         .metadata(oAuth2.addTokenToMetadata(token))
                         .data(new CreateComment("post", null, "body"))
-                        .retrieveMono(Comment.class))
+                        .retrieveMono(Comment.class)
                 .flatMap(comment -> voteRepo.findVoteByCommentIdAndUsername(comment.getCommentId(), comment.getAuthor()));
 
         StepVerifier
@@ -443,28 +417,24 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Comment> created = connectTcp()
-                .flatMap(req -> req
-                        .route("create.comment")
+        Mono<Comment> created = tcp().route("create.comment")
                         .metadata(oAuth2.addTokenToMetadata(token))
                         .data(new CreateComment("post", null, "body"))
-                        .retrieveMono(Comment.class))
+                        .retrieveMono(Comment.class)
                 .flatMap(comment -> commentRepo.findById(comment.getCommentId()));
 
         StepVerifier
                 .create(created)
-                .expectNextMatches(it -> it.getScore().equals(1L))
+                .expectNextMatches(it -> it.getScore() == 1L)
                 .verifyComplete();
     }
 
     @Test
     public void editComment_whenNoJwt_shouldReturnError() {
 
-        Mono<Comment> edited = connectTcp()
-                .flatMap(req -> req
-                        .route("edit.comment.{commentId}", "test")
+        Mono<Comment> edited = tcp().route("edit.comment.{commentId}", "test")
                         .data(new EditComment("new body"))
-                        .retrieveMono(Comment.class));
+                        .retrieveMono(Comment.class);
 
         StepVerifier
                 .create(edited)
@@ -480,12 +450,10 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Comment> edited = connectTcp()
-                .flatMap(req -> req
-                        .route("edit.comment.{commentId}", comment.getCommentId())
+        Mono<Comment> edited = tcp().route("edit.comment.{commentId}", comment.getCommentId())
                         .metadata(oAuth2.addTokenToMetadata(token))
                         .data(new EditComment("new body"))
-                        .retrieveMono(Comment.class));
+                        .retrieveMono(Comment.class);
 
         StepVerifier
                 .create(edited)
@@ -500,12 +468,10 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Comment> edited = connectTcp()
-                .flatMap(req -> req
-                        .route("edit.comment.{commentId}", "test")
+        Mono<Comment> edited = tcp().route("edit.comment.{commentId}", "test")
                         .metadata(oAuth2.addTokenToMetadata(token))
                         .data(new EditComment("new body"))
-                        .retrieveMono(Comment.class));
+                        .retrieveMono(Comment.class);
 
         StepVerifier
                 .create(edited)
@@ -522,12 +488,10 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Comment> edited = connectTcp()
-                .flatMap(req -> req
-                        .route("edit.comment.{commentId}", comment.getCommentId())
+        Mono<Comment> edited = tcp().route("edit.comment.{commentId}", comment.getCommentId())
                         .metadata(oAuth2.addTokenToMetadata(token))
                         .data(new EditComment("new body"))
-                        .retrieveMono(Comment.class));
+                        .retrieveMono(Comment.class);
 
         StepVerifier
                 .create(edited)
@@ -538,10 +502,8 @@ class CommentServiceApplicationTests {
     @Test
     public void deleteComment_whenNoJwt_shouldReturnError() {
 
-        Mono<Void> deleted = connectTcp()
-                .flatMap(req -> req
-                        .route("delete.comment.{commentId}", "test")
-                        .retrieveMono(Void.class));
+        Mono<Void> deleted = tcp().route("delete.comment.{commentId}", "test")
+                        .retrieveMono(Void.class);
 
         StepVerifier
                 .create(deleted)
@@ -557,11 +519,9 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Comment> deleted = connectTcp()
-                .flatMap(req -> req
-                        .route("delete.comment.{commentId}", comment.getCommentId())
+        Mono<Comment> deleted = tcp().route("delete.comment.{commentId}", comment.getCommentId())
                         .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+                        .retrieveMono(Void.class)
                 .then(Mono.defer(() -> commentRepo.findById(comment.getCommentId())));
 
         StepVerifier
@@ -575,11 +535,9 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Void> deleted = connectTcp()
-                .flatMap(req -> req
-                        .route("delete.comment.{commentId}", "test")
+        Mono<Void> deleted = tcp().route("delete.comment.{commentId}", "test")
                         .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class));
+                        .retrieveMono(Void.class);
 
         StepVerifier
                 .create(deleted)
@@ -596,11 +554,9 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Void> deleted = connectTcp()
-                .flatMap(req -> req
-                        .route("delete.comment.{commentId}", comment.getCommentId())
+        Mono<Void> deleted = tcp().route("delete.comment.{commentId}", comment.getCommentId())
                         .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class));
+                        .retrieveMono(Void.class);
 
         StepVerifier
                 .create(deleted)
@@ -612,10 +568,8 @@ class CommentServiceApplicationTests {
     @Test
     public void voteComment_whenNoJwt_shouldReturnError() {
 
-        Mono<Void> voted = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.comment.{commentId}.{voteType}", "test", VoteType.UPVOTE)
-                        .retrieveMono(Void.class));
+        Mono<Void> voted = tcp().route("vote.comment.{commentId}.{voteType}", "test", VoteType.UPVOTE)
+                        .retrieveMono(Void.class);
 
         StepVerifier
                 .create(voted)
@@ -632,11 +586,9 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Vote> voted = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.comment.{commentId}.{voteType}", comment.getCommentId(), voteType)
+        Mono<Vote> voted = tcp().route("vote.comment.{commentId}.{voteType}", comment.getCommentId(), voteType)
                         .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+                        .retrieveMono(Void.class)
                 .then(Mono.defer(() -> voteRepo.findVoteByCommentIdAndUsername(comment.getCommentId(), "reddit-user")));
 
         StepVerifier
@@ -660,16 +612,14 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Comment> voted = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.comment.{commentId}.{voteType}", comment.getCommentId(), voteType)
+        Mono<Comment> voted = tcp().route("vote.comment.{commentId}.{voteType}", comment.getCommentId(), voteType)
                         .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+                        .retrieveMono(Void.class)
                 .then(Mono.defer(() -> commentRepo.findById(comment.getCommentId())));
 
         StepVerifier
                 .create(voted)
-                .expectNextMatches(it -> it.getScore().equals(expectedScore))
+                .expectNextMatches(it -> it.getScore() == expectedScore)
                 .verifyComplete();
     }
 
@@ -679,11 +629,9 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Void> voted = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.comment.{commentId}.{voteType}", "test", voteType)
+        Mono<Void> voted = tcp().route("vote.comment.{commentId}.{voteType}", "test", voteType)
                         .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class));
+                        .retrieveMono(Void.class);
 
         StepVerifier
                 .create(voted)
@@ -705,11 +653,9 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Vote> overridden = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.comment.{commentId}.{voteType}", comment.getCommentId(), voteType.opposite())
+        Mono<Vote> overridden = tcp().route("vote.comment.{commentId}.{voteType}", comment.getCommentId(), voteType.opposite())
                         .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+                        .retrieveMono(Void.class)
                 .then(Mono.defer(() -> voteRepo.findVoteByCommentIdAndUsername(comment.getCommentId(), "reddit-user")));
 
         StepVerifier
@@ -741,16 +687,14 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Comment> overridden = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.comment.{commentId}.{voteType}", comment.getCommentId(), voteType.opposite())
+        Mono<Comment> overridden = tcp().route("vote.comment.{commentId}.{voteType}", comment.getCommentId(), voteType.opposite())
                         .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+                        .retrieveMono(Void.class)
                 .then(Mono.defer(() -> commentRepo.findById(comment.getCommentId())));
 
         StepVerifier
                 .create(overridden)
-                .expectNextMatches(it -> it.getScore().equals(expectedScore))
+                .expectNextMatches(it -> it.getScore() == expectedScore)
                 .verifyComplete();
     }
 
@@ -768,11 +712,9 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Vote> voted = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.comment.{commentId}.{voteType}", comment.getCommentId(), voteType)
+        Mono<Vote> voted = tcp().route("vote.comment.{commentId}.{voteType}", comment.getCommentId(), voteType)
                         .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+                        .retrieveMono(Void.class)
                 .then(Mono.defer(() -> voteRepo.findVoteByCommentIdAndUsername(comment.getCommentId(), "reddit-user")));
 
         StepVerifier
@@ -799,16 +741,14 @@ class CommentServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Comment> restored = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.comment.{commentId}.{voteType}", comment.getCommentId(), voteType)
+        Mono<Comment> restored = tcp().route("vote.comment.{commentId}.{voteType}", comment.getCommentId(), voteType)
                         .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+                        .retrieveMono(Void.class)
                 .then(Mono.defer(() -> commentRepo.findById(comment.getCommentId())));
 
         StepVerifier
                 .create(restored)
-                .expectNextMatches(it -> it.getScore().equals(previousScore))
+                .expectNextMatches(it -> it.getScore() == previousScore)
                 .verifyComplete();
     }
 

@@ -27,7 +27,7 @@ import reactor.test.StepVerifier;
 
 import java.util.function.Consumer;
 
-@SpringBootTest("spring.rsocket.server.port=0")
+@SpringBootTest
 public class UserServiceApplicationTests {
 
     @LocalRSocketServerPort
@@ -47,11 +47,11 @@ public class UserServiceApplicationTests {
         userProfileRepo.deleteAll().block();
     }
 
-    private Mono<RSocketRequester> connectTcp() {
+    private RSocketRequester connectTcp() {
         return requesterBuilder
                 .dataMimeType(MediaType.APPLICATION_CBOR)
                 .rsocketStrategies(configurer -> configurer.encoder(new BearerTokenAuthenticationEncoder()))
-                .connectTcp("localhost", port);
+                .tcp("localhost", port);
     }
 
     @Test
@@ -60,9 +60,8 @@ public class UserServiceApplicationTests {
         userProfileRepo.save(UserProfile.of("reddit-user")).block();
 
         Mono<UserProfile> myUserProfile = connectTcp()
-                .flatMap(req -> req
                         .route("find.user-profile.{username}", "reddit-user")
-                        .retrieveMono(UserProfile.class));
+                        .retrieveMono(UserProfile.class);
 
         StepVerifier
                 .create(myUserProfile)
@@ -74,9 +73,8 @@ public class UserServiceApplicationTests {
     public void findUserProfileByUsername_whenNotFound_shouldReturnError() {
 
         Mono<UserProfile> myUserProfile = connectTcp()
-                .flatMap(req -> req
                         .route("find.user-profile.{username}", "reddit-user")
-                        .retrieveMono(UserProfile.class));
+                        .retrieveMono(UserProfile.class);
 
         StepVerifier
                 .create(myUserProfile)
@@ -88,9 +86,8 @@ public class UserServiceApplicationTests {
     public void createMyUserProfile_whenNoJwt_shouldReturnError() {
 
         Mono<UserProfile> created = connectTcp()
-                .flatMap(req -> req
                         .route("create.user-profile.me")
-                        .retrieveMono(UserProfile.class));
+                        .retrieveMono(UserProfile.class);
 
         StepVerifier
                 .create(created)
@@ -103,10 +100,9 @@ public class UserServiceApplicationTests {
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
         Mono<UserProfile> created = connectTcp()
-                .flatMap(req -> req
                         .route("create.user-profile.me")
                         .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(UserProfile.class));
+                        .retrieveMono(UserProfile.class);
 
         StepVerifier
                 .create(created)
@@ -125,10 +121,9 @@ public class UserServiceApplicationTests {
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
         Mono<UserProfile> created = connectTcp()
-                .flatMap(req -> req
                         .route("create.user-profile.me")
                         .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(UserProfile.class));
+                        .retrieveMono(UserProfile.class);
 
         StepVerifier
                 .create(created)

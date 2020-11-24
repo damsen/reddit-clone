@@ -11,7 +11,7 @@ public class UserProfileService {
 
     private final UserProfileRepository userProfileRepo;
 
-    public Mono<UserProfile> findPublicUserProfileByUsername(String username) {
+    public Mono<UserProfile> findUserProfileByUsername(String username) {
         return userProfileRepo
                 .findByUsername(username)
                 .switchIfEmpty(Mono.error(new UserProfileNotFoundException(username)));

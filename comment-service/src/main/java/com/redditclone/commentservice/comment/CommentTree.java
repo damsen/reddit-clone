@@ -13,9 +13,10 @@ public class CommentTree {
     String parentId;
     String author;
     String body;
-    Long score;
+    long score;
     Instant commented;
-    Instant updated;
+    Instant edited;
+    boolean deleted;
     List<CommentTree> children;
 
     public static CommentTree of(Comment parent, List<CommentTree> children) {
@@ -28,6 +29,7 @@ public class CommentTree {
                 parent.getScore(),
                 parent.getCommented(),
                 parent.getEdited(),
+                parent.isDeleted(),
                 children
         );
     }

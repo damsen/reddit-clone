@@ -10,8 +10,8 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 public class Karma {
 
-    Long postKarma;
-    Long commentKarma;
+    long postKarma;
+    long commentKarma;
 
     public static Karma withZeroKarma() {
         return new Karma(0L, 0L);

@@ -16,11 +16,6 @@ public class PostController {
 
     private final PostService postService;
 
-    @MessageMapping("find.post.{postId}")
-    public Mono<Post> findPostById(@DestinationVariable String postId) {
-        return postService.findPostById(postId);
-    }
-
     @MessageMapping("find.posts.subreddit.{subredditName}")
     public Flux<Post> findPostsBySubreddit(@DestinationVariable String subredditName,
                                            PostRequest request) {
@@ -31,6 +26,11 @@ public class PostController {
     public Flux<Post> findPostsByUsername(@DestinationVariable String username,
                                           PostRequest request) {
         return postService.findPostsByUsername(username, request);
+    }
+
+    @MessageMapping("find.post.{postId}")
+    public Mono<Post> findPostById(@DestinationVariable String postId) {
+        return postService.findPostById(postId);
     }
 
     @MessageMapping("create.post")

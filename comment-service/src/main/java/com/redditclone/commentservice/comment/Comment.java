@@ -23,7 +23,7 @@ public class Comment {
     String parentId;
     String author;
     String body;
-    Long score;
+    long score;
     Instant commented;
     Instant edited;
     boolean deleted;

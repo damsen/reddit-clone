@@ -1,4 +1,13 @@
+logging:
+  level:
+    root: debug
+
 spring:
+  main:
+    web-application-type: none
+  rsocket:
+    server:
+      port: 0
   security:
     oauth2:
       client:
@@ -8,13 +17,10 @@ spring:
         registration:
           keycloak:
             client-id: reddit-service
-            client-secret: b7dd0b14-8009-4a2b-ae00-34b591b13ac1
+            client-secret: 81196896-80bd-41e3-97e6-3556feeef577
             authorization-grant-type: password
       #            authorization-grant-type: client_credentials
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:8080/auth/realms/reddit-clone
 
-logging:
-  level:
-    root: debug
+oauth2:
+  resource-server:
+    oidc-issuer-location: http://localhost:8080/auth/realms/reddit-clone

@@ -23,7 +23,7 @@ public class Post {
     String author;
     String title;
     String body;
-    Long score;
+    long score;
     Instant posted;
     Instant edited;
     boolean deleted;

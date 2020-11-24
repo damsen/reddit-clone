@@ -14,18 +14,18 @@ public class PostService {
     private final PostRepository postRepo;
     private final VoteService voteService;
 
-    public Mono<Post> findPostById(String postId) {
-        return postRepo
-                .findById(postId)
-                .switchIfEmpty(Mono.error(new PostNotFoundException(postId)));
-    }
-
     public Flux<Post> findPostsBySubreddit(String subredditName, PostRequest request) {
         return postRepo.findBySubredditName(subredditName, request.toPageable());
     }
 
     public Flux<Post> findPostsByUsername(String username, PostRequest request) {
         return postRepo.findByAuthor(username, request.toPageable());
+    }
+
+    public Mono<Post> findPostById(String postId) {
+        return postRepo
+                .findById(postId)
+                .switchIfEmpty(Mono.error(new PostNotFoundException(postId)));
     }
 
     public Mono<Post> createPost(String username, CreatePost create) {

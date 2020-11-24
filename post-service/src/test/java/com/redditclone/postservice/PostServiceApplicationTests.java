@@ -33,7 +33,7 @@ import java.time.Month;
 import java.time.ZoneOffset;
 import java.util.function.Consumer;
 
-@SpringBootTest("spring.rsocket.server.port=0")
+@SpringBootTest
 public class PostServiceApplicationTests {
 
     @LocalRSocketServerPort
@@ -57,44 +57,11 @@ public class PostServiceApplicationTests {
         voteRepo.deleteAll().block();
     }
 
-    private Mono<RSocketRequester> connectTcp() {
+    private RSocketRequester tcp() {
         return requesterBuilder
                 .dataMimeType(MediaType.APPLICATION_CBOR)
                 .rsocketStrategies(configurer -> configurer.encoder(new BearerTokenAuthenticationEncoder()))
-                .connectTcp("localhost", port);
-    }
-
-    @Test
-    public void findPostById_whenFound_shouldReturnPost() {
-
-        Post post = postRepo.save(Post.of("test", "author", "title", "body")).block();
-
-        Mono<Post> postById = connectTcp()
-                .flatMap(req -> req
-                        .route("find.post.{postId}", post.getPostId())
-                        .retrieveMono(Post.class));
-
-        StepVerifier
-                .create(postById)
-                .expectNextMatches(it -> it.getSubredditName().equals("test") &&
-                                         it.getAuthor().equals("author") &&
-                                         it.getTitle().equals("title") &&
-                                         it.getBody().equals("body"))
-                .verifyComplete();
-    }
-
-    @Test
-    public void findPostById_whenNotFound_shouldReturnError() {
-
-        Mono<Post> post = connectTcp()
-                .flatMap(req -> req
-                        .route("find.post.{postId}", "test")
-                        .retrieveMono(Post.class));
-
-        StepVerifier
-                .create(post)
-                .expectErrorMatches(ex -> ex.getMessage().equals(String.format(PostNotFoundException.POST_NOT_FOUND, "test")))
-                .verify();
+                .tcp("localhost", port);
     }
 
     @Test
@@ -103,11 +70,10 @@ public class PostServiceApplicationTests {
         postRepo.save(Post.of("test1", "author1", "title1", "body1")).block();
         postRepo.save(Post.of("test1", "author2", "title2", "body2")).block();
 
-        Flux<Post> postsBySubredditName = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.posts.subreddit.{subredditName}", "test1")
-                        .data(PostRequest.builder().page(1).size(1).build())
-                        .retrieveFlux(Post.class));
+        Flux<Post> postsBySubredditName = tcp()
+                .route("find.posts.subreddit.{subredditName}", "test1")
+                .data(PostRequest.builder().page(1).size(1).build())
+                .retrieveFlux(Post.class);
 
         StepVerifier
                 .create(postsBySubredditName)
@@ -133,11 +99,10 @@ public class PostServiceApplicationTests {
         middle.setPosted(LocalDate.of(2020, Month.MARCH, 1).atStartOfDay().toInstant(ZoneOffset.UTC));
         postRepo.save(middle).block();
 
-        Flux<Post> postsBySubredditName = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.posts.subreddit.{subredditName}", "test1")
-                        .data(PostRequest.builder().sort(PostRequest.SortBy.NEW).build())
-                        .retrieveFlux(Post.class));
+        Flux<Post> postsBySubredditName = tcp()
+                .route("find.posts.subreddit.{subredditName}", "test1")
+                .data(PostRequest.builder().sort(PostRequest.SortBy.NEW).build())
+                .retrieveFlux(Post.class);
 
         StepVerifier
                 .create(postsBySubredditName)
@@ -162,11 +127,10 @@ public class PostServiceApplicationTests {
         middle.setPosted(LocalDate.of(2020, Month.MARCH, 1).atStartOfDay().toInstant(ZoneOffset.UTC));
         postRepo.save(middle).block();
 
-        Flux<Post> postsBySubredditName = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.posts.subreddit.{subredditName}", "test1")
-                        .data(PostRequest.builder().sort(PostRequest.SortBy.OLD).build())
-                        .retrieveFlux(Post.class));
+        Flux<Post> postsBySubredditName = tcp()
+                .route("find.posts.subreddit.{subredditName}", "test1")
+                .data(PostRequest.builder().sort(PostRequest.SortBy.OLD).build())
+                .retrieveFlux(Post.class);
 
         StepVerifier
                 .create(postsBySubredditName)
@@ -191,11 +155,10 @@ public class PostServiceApplicationTests {
         middle.setScore(20L);
         postRepo.save(middle).block();
 
-        Flux<Post> postsBySubredditName = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.posts.subreddit.{subredditName}", "test1")
-                        .data(PostRequest.builder().sort(PostRequest.SortBy.TOP).build())
-                        .retrieveFlux(Post.class));
+        Flux<Post> postsBySubredditName = tcp()
+                .route("find.posts.subreddit.{subredditName}", "test1")
+                .data(PostRequest.builder().sort(PostRequest.SortBy.TOP).build())
+                .retrieveFlux(Post.class);
 
         StepVerifier
                 .create(postsBySubredditName)
@@ -211,11 +174,10 @@ public class PostServiceApplicationTests {
         postRepo.save(Post.of("test1", "author1", "title1", "body1")).block();
         postRepo.save(Post.of("test2", "author1", "title2", "body2")).block();
 
-        Flux<Post> postsBySubredditName = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.posts.user.{username}", "author1")
-                        .data(PostRequest.builder().page(1).size(1).build())
-                        .retrieveFlux(Post.class));
+        Flux<Post> postsBySubredditName = tcp()
+                .route("find.posts.user.{username}", "author1")
+                .data(PostRequest.builder().page(1).size(1).build())
+                .retrieveFlux(Post.class);
 
         StepVerifier
                 .create(postsBySubredditName)
@@ -241,11 +203,10 @@ public class PostServiceApplicationTests {
         middle.setPosted(LocalDate.of(2020, Month.MARCH, 1).atStartOfDay().toInstant(ZoneOffset.UTC));
         postRepo.save(middle).block();
 
-        Flux<Post> postsBySubredditName = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.posts.user.{username}", "author1")
-                        .data(PostRequest.builder().sort(PostRequest.SortBy.NEW).build())
-                        .retrieveFlux(Post.class));
+        Flux<Post> postsBySubredditName = tcp()
+                .route("find.posts.user.{username}", "author1")
+                .data(PostRequest.builder().sort(PostRequest.SortBy.NEW).build())
+                .retrieveFlux(Post.class);
 
         StepVerifier
                 .create(postsBySubredditName)
@@ -270,11 +231,10 @@ public class PostServiceApplicationTests {
         middle.setPosted(LocalDate.of(2020, Month.MARCH, 1).atStartOfDay().toInstant(ZoneOffset.UTC));
         postRepo.save(middle).block();
 
-        Flux<Post> postsBySubredditName = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.posts.user.{username}", "author1")
-                        .data(PostRequest.builder().sort(PostRequest.SortBy.OLD).build())
-                        .retrieveFlux(Post.class));
+        Flux<Post> postsBySubredditName = tcp()
+                .route("find.posts.user.{username}", "author1")
+                .data(PostRequest.builder().sort(PostRequest.SortBy.OLD).build())
+                .retrieveFlux(Post.class);
 
         StepVerifier
                 .create(postsBySubredditName)
@@ -299,11 +259,10 @@ public class PostServiceApplicationTests {
         middle.setScore(20L);
         postRepo.save(middle).block();
 
-        Flux<Post> postsBySubredditName = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.posts.user.{username}", "author1")
-                        .data(PostRequest.builder().sort(PostRequest.SortBy.TOP).build())
-                        .retrieveFlux(Post.class));
+        Flux<Post> postsBySubredditName = tcp()
+                .route("find.posts.user.{username}", "author1")
+                .data(PostRequest.builder().sort(PostRequest.SortBy.TOP).build())
+                .retrieveFlux(Post.class);
 
         StepVerifier
                 .create(postsBySubredditName)
@@ -314,13 +273,43 @@ public class PostServiceApplicationTests {
     }
 
     @Test
+    public void findPostById_whenFound_shouldReturnPost() {
+
+        Post post = postRepo.save(Post.of("test", "author", "title", "body")).block();
+
+        Mono<Post> postById = tcp()
+                .route("find.post.{postId}", post.getPostId())
+                .retrieveMono(Post.class);
+
+        StepVerifier
+                .create(postById)
+                .expectNextMatches(it -> it.getSubredditName().equals("test") &&
+                                         it.getAuthor().equals("author") &&
+                                         it.getTitle().equals("title") &&
+                                         it.getBody().equals("body"))
+                .verifyComplete();
+    }
+
+    @Test
+    public void findPostById_whenNotFound_shouldReturnError() {
+
+        Mono<Post> post = tcp()
+                .route("find.post.{postId}", "test")
+                .retrieveMono(Post.class);
+
+        StepVerifier
+                .create(post)
+                .expectErrorMatches(ex -> ex.getMessage().equals(String.format(PostNotFoundException.POST_NOT_FOUND, "test")))
+                .verify();
+    }
+
+    @Test
     public void createPost_whenNoJwt_shouldReturnError() {
 
-        Mono<Post> post = connectTcp()
-                .flatMap(req -> req
-                        .route("create.post")
-                        .data(new CreatePost("test", "title", "body"))
-                        .retrieveMono(Post.class));
+        Mono<Post> post = tcp()
+                .route("create.post")
+                .data(new CreatePost("test", "title", "body"))
+                .retrieveMono(Post.class);
 
         StepVerifier
                 .create(post)
@@ -332,12 +321,11 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Post> post = connectTcp()
-                .flatMap(req -> req
-                        .route("create.post")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new CreatePost("test", "title", "body"))
-                        .retrieveMono(Post.class));
+        Mono<Post> post = tcp()
+                .route("create.post")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new CreatePost("test", "title", "body"))
+                .retrieveMono(Post.class);
 
         StepVerifier
                 .create(post)
@@ -353,12 +341,11 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Vote> vote = connectTcp()
-                .flatMap(req -> req
-                        .route("create.post")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new CreatePost("test", "title", "body"))
-                        .retrieveMono(Post.class))
+        Mono<Vote> vote = tcp()
+                .route("create.post")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new CreatePost("test", "title", "body"))
+                .retrieveMono(Post.class)
                 .flatMap(post -> voteRepo.findVoteByPostIdAndUsername(post.getPostId(), post.getAuthor()));
 
         StepVerifier
@@ -373,28 +360,26 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Post> created = connectTcp()
-                .flatMap(req -> req
-                        .route("create.post")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new CreatePost("test", "title", "body"))
-                        .retrieveMono(Post.class))
+        Mono<Post> created = tcp()
+                .route("create.post")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new CreatePost("test", "title", "body"))
+                .retrieveMono(Post.class)
                 .flatMap(post -> postRepo.findById(post.getPostId()));
 
         StepVerifier
                 .create(created)
-                .expectNextMatches(it -> it.getScore().equals(1L))
+                .expectNextMatches(it -> it.getScore() == 1L)
                 .verifyComplete();
     }
 
     @Test
     public void editPost_whenNoJwt_shouldReturnError() {
 
-        Mono<Post> edited = connectTcp()
-                .flatMap(req -> req
-                        .route("edit.post.{postId}", "test")
-                        .data(new EditPost("new title", "new body"))
-                        .retrieveMono(Post.class));
+        Mono<Post> edited = tcp()
+                .route("edit.post.{postId}", "test")
+                .data(new EditPost("new title", "new body"))
+                .retrieveMono(Post.class);
 
         StepVerifier
                 .create(edited)
@@ -410,12 +395,11 @@ public class PostServiceApplicationTests {
                 .save(Post.of("subreddit", "reddit-user", "title", "body"))
                 .block();
 
-        Mono<Post> edited = connectTcp()
-                .flatMap(req -> req
-                        .route("edit.post.{postId}", post.getPostId())
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new EditPost("new title", "new body"))
-                        .retrieveMono(Post.class));
+        Mono<Post> edited = tcp()
+                .route("edit.post.{postId}", post.getPostId())
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new EditPost("new title", "new body"))
+                .retrieveMono(Post.class);
 
         StepVerifier
                 .create(edited)
@@ -430,12 +414,11 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Post> edited = connectTcp()
-                .flatMap(req -> req
-                        .route("edit.post.{postId}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new EditPost("new title", "new body"))
-                        .retrieveMono(Post.class));
+        Mono<Post> edited = tcp()
+                .route("edit.post.{postId}", "test")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new EditPost("new title", "new body"))
+                .retrieveMono(Post.class);
 
         StepVerifier
                 .create(edited)
@@ -452,12 +435,11 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Post> edited = connectTcp()
-                .flatMap(req -> req
-                        .route("edit.post.{postId}", post.getPostId())
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new EditPost("new title", "new body"))
-                        .retrieveMono(Post.class));
+        Mono<Post> edited = tcp()
+                .route("edit.post.{postId}", post.getPostId())
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new EditPost("new title", "new body"))
+                .retrieveMono(Post.class);
 
         StepVerifier
                 .create(edited)
@@ -468,10 +450,9 @@ public class PostServiceApplicationTests {
     @Test
     public void deletePost_whenNoJwt_shouldReturnError() {
 
-        Mono<Void> deleted = connectTcp()
-                .flatMap(req -> req
-                        .route("delete.post.{postId}", "test")
-                        .retrieveMono(Void.class));
+        Mono<Void> deleted = tcp()
+                .route("delete.post.{postId}", "test")
+                .retrieveMono(Void.class);
         StepVerifier
                 .create(deleted)
                 .verifyErrorMatches(ex -> ex.getMessage().equals("Access Denied"));
@@ -486,11 +467,10 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Post> deleted = connectTcp()
-                .flatMap(req -> req
-                        .route("delete.post.{postId}", post.getPostId())
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Post> deleted = tcp()
+                .route("delete.post.{postId}", post.getPostId())
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> postRepo.findById(post.getPostId())));
 
         StepVerifier
@@ -504,11 +484,10 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Void> deleted = connectTcp()
-                .flatMap(req -> req
-                        .route("delete.post.{postId}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class));
+        Mono<Void> deleted = tcp()
+                .route("delete.post.{postId}", "test")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class);
 
         StepVerifier
                 .create(deleted)
@@ -525,11 +504,10 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Void> deleted = connectTcp()
-                .flatMap(req -> req
-                        .route("delete.post.{postId}", post.getPostId())
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class));
+        Mono<Void> deleted = tcp()
+                .route("delete.post.{postId}", post.getPostId())
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class);
 
         StepVerifier
                 .create(deleted)
@@ -541,10 +519,9 @@ public class PostServiceApplicationTests {
     @Test
     public void votePost_whenNoJwt_shouldReturnError() {
 
-        Mono<Void> voted = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.post.{postId}.{voteType}", "test", VoteType.UPVOTE)
-                        .retrieveMono(Void.class));
+        Mono<Void> voted = tcp()
+                .route("vote.post.{postId}.{voteType}", "test", VoteType.UPVOTE)
+                .retrieveMono(Void.class);
         StepVerifier
                 .create(voted)
                 .verifyErrorMatches(ex -> ex.getMessage().equals("Access Denied"));
@@ -560,11 +537,10 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Vote> voted = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.post.{postId}.{voteType}", post.getPostId(), voteType)
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Vote> voted = tcp()
+                .route("vote.post.{postId}.{voteType}", post.getPostId(), voteType)
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> voteRepo.findVoteByPostIdAndUsername(post.getPostId(), "reddit-user")));
 
         StepVerifier
@@ -588,16 +564,15 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Post> voted = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.post.{postId}.{voteType}", post.getPostId(), voteType)
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Post> voted = tcp()
+                .route("vote.post.{postId}.{voteType}", post.getPostId(), voteType)
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> postRepo.findById(post.getPostId())));
 
         StepVerifier
                 .create(voted)
-                .expectNextMatches(it -> it.getScore().equals(expectedScore))
+                .expectNextMatches(it -> it.getScore() == expectedScore)
                 .verifyComplete();
     }
 
@@ -607,11 +582,10 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Void> voted = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.post.{postId}.{voteType}", "test", voteType)
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class));
+        Mono<Void> voted = tcp()
+                .route("vote.post.{postId}.{voteType}", "test", voteType)
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class);
 
         StepVerifier
                 .create(voted)
@@ -633,11 +607,10 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Vote> overridden = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.post.{postId}.{voteType}", post.getPostId(), voteType.opposite())
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Vote> overridden = tcp()
+                .route("vote.post.{postId}.{voteType}", post.getPostId(), voteType.opposite())
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> voteRepo.findVoteByPostIdAndUsername(post.getPostId(), "reddit-user")));
 
         StepVerifier
@@ -669,16 +642,15 @@ public class PostServiceApplicationTests {
                 .flatMap(postRepo::save)
                 .block();
 
-        Mono<Post> overridden = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.post.{postId}.{voteType}", post.getPostId(), voteType.opposite())
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Post> overridden = tcp()
+                .route("vote.post.{postId}.{voteType}", post.getPostId(), voteType.opposite())
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> postRepo.findById(post.getPostId())));
 
         StepVerifier
                 .create(overridden)
-                .expectNextMatches(it -> it.getScore().equals(expectedScore))
+                .expectNextMatches(it -> it.getScore() == expectedScore)
                 .verifyComplete();
     }
 
@@ -696,11 +668,10 @@ public class PostServiceApplicationTests {
 
         String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
 
-        Mono<Vote> voted = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.post.{postId}.{voteType}", post.getPostId(), voteType)
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Vote> voted = tcp()
+                .route("vote.post.{postId}.{voteType}", post.getPostId(), voteType)
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> voteRepo.findVoteByPostIdAndUsername(post.getPostId(), "reddit-user")));
 
         StepVerifier
@@ -727,16 +698,15 @@ public class PostServiceApplicationTests {
                 .flatMap(postRepo::save)
                 .block();
 
-        Mono<Post> restored = connectTcp()
-                .flatMap(req -> req
-                        .route("vote.post.{postId}.{voteType}", post.getPostId(), voteType)
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Post> restored = tcp()
+                .route("vote.post.{postId}.{voteType}", post.getPostId(), voteType)
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> postRepo.findById(post.getPostId())));
 
         StepVerifier
                 .create(restored)
-                .expectNextMatches(it -> it.getScore().equals(previousScore))
+                .expectNextMatches(it -> it.getScore() == previousScore)
                 .verifyComplete();
     }
 

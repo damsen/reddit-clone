@@ -1,18 +1,29 @@
+logging:
+  level:
+    root: info
+
+server:
+  shutdown: graceful
+
 spring:
+  main:
+    web-application-type: none
   rsocket:
     server:
       port: 7001
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: local
   data:
     mongodb:
       host: localhost
       port: 27017
       database: reddit-clone
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:8080/auth/realms/reddit-clone
 
-logging:
-  level:
-    root: info
+oauth2:
+  resource-server:
+    oidc-issuer-location: http://localhost:8080/auth/realms/reddit-clone

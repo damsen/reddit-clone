@@ -1,7 +1,6 @@
 package com.redditclone.userservice.userprofile;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,8 +15,8 @@ public class UserProfileController {
     private final UserProfileService userProfileService;
 
     @MessageMapping("find.user-profile.{username}")
-    public Mono<UserProfile> findPublicUserProfileByUsername(@DestinationVariable String username) {
-        return userProfileService.findPublicUserProfileByUsername(username);
+    public Mono<UserProfile> findUserProfileByUsername(@DestinationVariable String username) {
+        return userProfileService.findUserProfileByUsername(username);
     }
 
     @MessageMapping("create.user-profile.me")
