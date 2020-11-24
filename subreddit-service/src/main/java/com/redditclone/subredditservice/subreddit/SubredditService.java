@@ -1,6 +1,7 @@
 package com.redditclone.subredditservice.subreddit;
 
-import com.redditclone.subredditservice.member.*;
+import com.redditclone.subredditservice.member.MemberNotFoundException;
+import com.redditclone.subredditservice.member.MemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -12,7 +13,7 @@ import reactor.core.publisher.Mono;
 public class SubredditService {
 
     private final SubredditRepository subredditRepo;
-    private final MemberRepository memberRepo;
+    private final MemberService memberService;
 
     public Flux<Subreddit> findSubreddits(SubredditRequest request) {
         return subredditRepo.findAllBy(request.toPageable());
@@ -29,20 +30,18 @@ public class SubredditService {
                 .insert(Subreddit.from(username, create))
                 .onErrorMap(
                         ex -> ex instanceof DuplicateKeyException,
-                        ex -> new SubredditAlreadyPresentException(create.getName(), ex)
-                )
-                .flatMap(subreddit -> memberRepo
+                        ex -> new SubredditAlreadyPresentException(create.getName(), ex))
+                .flatMap(subreddit -> memberService
                         .findById(username)
-                        .doOnNext(member -> member.joinSubreddit(create.getName()))
-                        .switchIfEmpty(Mono.just(Member.of(username, create.getName())))
-                        .flatMap(memberRepo::save)
+                        .flatMap(member -> memberService.addSubredditToMembersJoinedSubreddits(member, subreddit.getName()))
+                        .switchIfEmpty(Mono.defer(() -> memberService.createMember(username, subreddit.getName())))
                         .thenReturn(subreddit))
                 .flatMap(this::updateSubredditMembersCount);
     }
 
     private Mono<Subreddit> updateSubredditMembersCount(Subreddit subreddit) {
-        return memberRepo
-                .countByJoinedSubredditsContains(subreddit.getName())
+        return memberService
+                .countMembersBySubredditName(subreddit.getName())
                 .map(subreddit::updateMembersCountWith)
                 .flatMap(subredditRepo::save);
     }
@@ -56,37 +55,29 @@ public class SubredditService {
     }
 
     public Mono<Void> addSubredditMember(String username, String subredditName) {
-        return memberRepo
+        return memberService
                 .findById(username)
                 .flatMap(member -> findSubredditByName(subredditName)
-                        .flatMap(subreddit -> Mono.just(subreddit)
-                                .map(Subreddit::getName)
-                                .filter(member::isNotMemberOf)
-                                .switchIfEmpty(Mono.error(new AlreadyAMemberOfSubredditException(username, subredditName)))
-                                .map(member::joinSubreddit)
-                                .flatMap(memberRepo::save)
-                                .then(Mono.defer(() -> updateSubredditMembersCount(subreddit)))))
+                        .flatMap(subreddit -> memberService
+                                .addSubredditToMembersJoinedSubreddits(member, subreddit.getName())
+                                .thenReturn(subreddit)))
                 .switchIfEmpty(Mono.defer(() -> findSubredditByName(subredditName)
-                        .flatMap(subreddit -> Mono.just(subreddit)
-                                .map(Subreddit::getName)
-                                .map(sub -> Member.of(username, sub))
-                                .flatMap(memberRepo::insert)
-                                .then(Mono.defer(() -> updateSubredditMembersCount(subreddit))))))
+                        .flatMap(subreddit -> memberService
+                                .createMember(username, subreddit.getName())
+                                .thenReturn(subreddit))))
+                .flatMap(this::updateSubredditMembersCount)
                 .then();
     }
 
     public Mono<Void> removeSubredditMember(String username, String subredditName) {
-        return memberRepo
+        return memberService
                 .findById(username)
                 .switchIfEmpty(Mono.error(new MemberNotFoundException(username)))
-                .filter(member -> member.isMemberOf(subredditName))
-                .switchIfEmpty(Mono.error(new NotMemberOfSubredditException(username, subredditName)))
                 .flatMap(member -> findSubredditByName(subredditName)
-                        .flatMap(subreddit -> Mono.just(subreddit)
-                                .map(Subreddit::getName)
-                                .map(member::leaveSubreddit)
-                                .flatMap(memberRepo::save)
-                                .then(Mono.defer(() -> updateSubredditMembersCount(subreddit)))))
+                        .flatMap(subreddit -> memberService
+                                .removeSubredditFromMembersJoinedSubreddits(member, subreddit.getName())
+                                .thenReturn(subreddit)))
+                .flatMap(this::updateSubredditMembersCount)
                 .then();
     }
 
