@@ -26,7 +26,7 @@ public class Subreddit {
     Instant created;
     Instant edited;
     Set<String> topics;
-    Long members;
+    long members;
 
     public static Subreddit of(String name, String title, String description, String author, Set<String> topics) {
         return new Subreddit(

@@ -11,8 +11,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.http.MediaType;
 import org.springframework.messaging.rsocket.RSocketRequester;
-import org.springframework.security.oauth2.client.endpoint.OAuth2PasswordGrantRequest;
-import org.springframework.security.oauth2.client.endpoint.WebClientReactivePasswordTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2ClientCredentialsGrantRequest;
+import org.springframework.security.oauth2.client.endpoint.WebClientReactiveClientCredentialsTokenResponseClient;
 import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
@@ -32,7 +32,7 @@ import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest("spring.rsocket.server.port=0")
+@SpringBootTest
 public class SubredditServiceApplicationTests {
 
     @LocalRSocketServerPort
@@ -56,11 +56,24 @@ public class SubredditServiceApplicationTests {
         memberRepo.deleteAll().block();
     }
 
-    private Mono<RSocketRequester> connectTcp() {
+    private RSocketRequester tcp() {
         return requesterBuilder
                 .dataMimeType(MediaType.APPLICATION_CBOR)
                 .rsocketStrategies(configurer -> configurer.encoder(new BearerTokenAuthenticationEncoder()))
-                .connectTcp("localhost", port);
+                .tcp("localhost", port);
+    }
+
+    @Test
+    public void findSubreddits_whenNoJwt_shouldReturnError() {
+
+        Flux<Subreddit> subreddits = tcp()
+                .route("find.subreddits")
+                .data(SubredditRequest.builder().build())
+                .retrieveFlux(Subreddit.class);
+
+        StepVerifier
+                .create(subreddits)
+                .verifyErrorMatches(ex -> ex.getMessage().equals("Access Denied"));
     }
 
     @Test
@@ -70,11 +83,13 @@ public class SubredditServiceApplicationTests {
         subredditRepo.save(Subreddit.of("test2", "title", "description", "author", Set.of())).block();
         subredditRepo.save(Subreddit.of("test3", "title", "description", "author", Set.of())).block();
 
-        Flux<Subreddit> subreddits = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.subreddits")
-                        .data(SubredditRequest.builder().page(1).size(2).build())
-                        .retrieveFlux(Subreddit.class));
+        String token = oAuth2.getAccessTokenForUsername().block();
+
+        Flux<Subreddit> subreddits = tcp()
+                .route("find.subreddits")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(SubredditRequest.builder().page(1).size(2).build())
+                .retrieveFlux(Subreddit.class);
 
         StepVerifier
                 .create(subreddits)
@@ -97,11 +112,13 @@ public class SubredditServiceApplicationTests {
         middle.setCreated(LocalDate.of(2020, Month.MARCH, 1).atStartOfDay().toInstant(ZoneOffset.UTC));
         subredditRepo.save(middle).block();
 
-        Flux<Subreddit> subreddits = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.subreddits")
-                        .data(SubredditRequest.builder().sort(SubredditRequest.SortBy.NEW).build())
-                        .retrieveFlux(Subreddit.class));
+        String token = oAuth2.getAccessTokenForUsername().block();
+
+        Flux<Subreddit> subreddits = tcp()
+                .route("find.subreddits")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(SubredditRequest.builder().sort(SubredditRequest.SortBy.NEW).build())
+                .retrieveFlux(Subreddit.class);
 
         StepVerifier
                 .create(subreddits)
@@ -126,11 +143,13 @@ public class SubredditServiceApplicationTests {
         middle.setCreated(LocalDate.of(2020, Month.MARCH, 1).atStartOfDay().toInstant(ZoneOffset.UTC));
         subredditRepo.save(middle).block();
 
-        Flux<Subreddit> subreddits = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.subreddits")
-                        .data(SubredditRequest.builder().sort(SubredditRequest.SortBy.OLD).build())
-                        .retrieveFlux(Subreddit.class));
+        String token = oAuth2.getAccessTokenForUsername().block();
+
+        Flux<Subreddit> subreddits = tcp()
+                .route("find.subreddits")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(SubredditRequest.builder().sort(SubredditRequest.SortBy.OLD).build())
+                .retrieveFlux(Subreddit.class);
 
         StepVerifier
                 .create(subreddits)
@@ -155,11 +174,13 @@ public class SubredditServiceApplicationTests {
         middle.setMembers(190L);
         subredditRepo.save(middle).block();
 
-        Flux<Subreddit> subreddits = connectTcp()
-                .flatMapMany(req -> req
-                        .route("find.subreddits")
-                        .data(SubredditRequest.builder().sort(SubredditRequest.SortBy.TOP).build())
-                        .retrieveFlux(Subreddit.class));
+        String token = oAuth2.getAccessTokenForUsername().block();
+
+        Flux<Subreddit> subreddits = tcp()
+                .route("find.subreddits")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(SubredditRequest.builder().sort(SubredditRequest.SortBy.TOP).build())
+                .retrieveFlux(Subreddit.class);
 
         StepVerifier
                 .create(subreddits)
@@ -170,16 +191,30 @@ public class SubredditServiceApplicationTests {
     }
 
     @Test
+    public void findSubredditByName_whenNoJwt_shouldReturnError() {
+
+        Mono<Subreddit> subreddit = tcp()
+                .route("find.subreddit.{subredditName}", "test")
+                .retrieveMono(Subreddit.class);
+
+        StepVerifier
+                .create(subreddit)
+                .verifyErrorMatches(ex -> ex.getMessage().equals("Access Denied"));
+    }
+
+    @Test
     public void findSubredditByName_whenSubredditFound_shouldReturnThatSubreddit() {
 
         subredditRepo
                 .save(Subreddit.of("test", "title", "description", "author", Set.of()))
                 .block();
 
-        Mono<Subreddit> subreddit = connectTcp()
-                .flatMap(req -> req
-                        .route("find.subreddit.{subredditName}", "test")
-                        .retrieveMono(Subreddit.class));
+        String token = oAuth2.getAccessTokenForUsername().block();
+
+        Mono<Subreddit> subreddit = tcp()
+                .route("find.subreddit.{subredditName}", "test")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Subreddit.class);
 
         StepVerifier
                 .create(subreddit)
@@ -190,10 +225,12 @@ public class SubredditServiceApplicationTests {
     @Test
     public void findSubredditByName_whenSubredditNotFound_shouldReturnError() {
 
-        Mono<Subreddit> subreddit = connectTcp()
-                .flatMap(req -> req
-                        .route("find.subreddit.{subredditName}", "test")
-                        .retrieveMono(Subreddit.class));
+        String token = oAuth2.getAccessTokenForUsername().block();
+
+        Mono<Subreddit> subreddit = tcp()
+                .route("find.subreddit.{subredditName}", "test")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Subreddit.class);
 
         StepVerifier
                 .create(subreddit)
@@ -204,11 +241,10 @@ public class SubredditServiceApplicationTests {
     @Test
     public void createSubreddit_whenNoJwt_shouldReturnError() {
 
-        Mono<Subreddit> subreddit = connectTcp()
-                .flatMap(req -> req
-                        .route("create.subreddit")
-                        .data(new CreateSubreddit("test", "title", "description", Set.of("topic")))
-                        .retrieveMono(Subreddit.class));
+        Mono<Subreddit> subreddit = tcp()
+                .route("create.subreddit.by.{username}", "reddit-user")
+                .data(new CreateSubreddit("test", "title", "description", Set.of("topic")))
+                .retrieveMono(Subreddit.class);
 
         StepVerifier
                 .create(subreddit)
@@ -218,14 +254,13 @@ public class SubredditServiceApplicationTests {
     @Test
     public void createSubreddit_shouldCreateSubreddit() {
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Subreddit> subreddit = connectTcp()
-                .flatMap(req -> req
-                        .route("create.subreddit")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new CreateSubreddit("test", "title", "description", Set.of("topic")))
-                        .retrieveMono(Subreddit.class));
+        Mono<Subreddit> subreddit = tcp()
+                .route("create.subreddit.by.{username}", "reddit-user")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new CreateSubreddit("test", "title", "description", Set.of("topic")))
+                .retrieveMono(Subreddit.class);
 
         StepVerifier
                 .create(subreddit)
@@ -240,18 +275,17 @@ public class SubredditServiceApplicationTests {
     @Test
     public void createSubreddit_whenSubredditWithSameNameAlreadyExists_shouldReturnError() {
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
         subredditRepo
                 .save(Subreddit.of("test", "title", "description", "author", Set.of()))
                 .block();
 
-        Mono<Subreddit> subreddit = connectTcp()
-                .flatMap(req -> req
-                        .route("create.subreddit")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new CreateSubreddit("test", "new title", "new description", Set.of("new topic")))
-                        .retrieveMono(Subreddit.class));
+        Mono<Subreddit> subreddit = tcp()
+                .route("create.subreddit.by.{username}", "reddit-user")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new CreateSubreddit("test", "new title", "new description", Set.of("new topic")))
+                .retrieveMono(Subreddit.class);
 
         StepVerifier
                 .create(subreddit)
@@ -262,14 +296,13 @@ public class SubredditServiceApplicationTests {
     @Test
     public void createSubreddit_whenCreatorIsNotAMember_shouldSaveSubredditCreatorAsMember() {
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Member> author = connectTcp()
-                .flatMap(req -> req
-                        .route("create.subreddit")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new CreateSubreddit("test", "title", "description", Set.of("topic")))
-                        .retrieveMono(Subreddit.class))
+        Mono<Member> author = tcp()
+                .route("create.subreddit.by.{username}", "reddit-user")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new CreateSubreddit("test", "title", "description", Set.of("topic")))
+                .retrieveMono(Subreddit.class)
                 .flatMap(subreddit -> memberRepo.findById("reddit-user"));
 
         StepVerifier
@@ -287,14 +320,13 @@ public class SubredditServiceApplicationTests {
                 .save(Member.of("reddit-user", "test1"))
                 .block();
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Member> member = connectTcp()
-                .flatMap(req -> req
-                        .route("create.subreddit")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new CreateSubreddit("test2", "title", "description", Set.of("topic")))
-                        .retrieveMono(Subreddit.class))
+        Mono<Member> member = tcp()
+                .route("create.subreddit.by.{username}", "reddit-user")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new CreateSubreddit("test2", "title", "description", Set.of("topic")))
+                .retrieveMono(Subreddit.class)
                 .flatMap(subreddit -> memberRepo.findById("reddit-user"));
 
         StepVerifier
@@ -306,29 +338,27 @@ public class SubredditServiceApplicationTests {
     @Test
     public void createSubreddit_shouldSetSubredditMembersCountToOne() {
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Subreddit> subreddit = connectTcp()
-                .flatMap(req -> req
-                        .route("create.subreddit")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new CreateSubreddit("test", "title", "description", Set.of("topic")))
-                        .retrieveMono(Subreddit.class));
+        Mono<Subreddit> subreddit = tcp()
+                .route("create.subreddit.by.{username}", "reddit-user")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new CreateSubreddit("test", "title", "description", Set.of("topic")))
+                .retrieveMono(Subreddit.class);
 
         StepVerifier
                 .create(subreddit)
-                .expectNextMatches(it -> it.getMembers().equals(1L))
+                .expectNextMatches(it -> it.getMembers() == 1L)
                 .verifyComplete();
     }
 
     @Test
     public void editSubreddit_whenNoJwt_shouldReturnError() {
 
-        Mono<Subreddit> edited = connectTcp()
-                .flatMap(req -> req
-                        .route("edit.subreddit.{subredditName}", "test")
-                        .data(new EditSubreddit("new title", "new description", Set.of("topic", "another topic")))
-                        .retrieveMono(Subreddit.class));
+        Mono<Subreddit> edited = tcp()
+                .route("edit.subreddit.{subredditName}.by.{username}", "test", "reddit-user")
+                .data(new EditSubreddit("new title", "new description", Set.of("topic", "another topic")))
+                .retrieveMono(Subreddit.class);
 
         StepVerifier
                 .create(edited)
@@ -341,14 +371,13 @@ public class SubredditServiceApplicationTests {
         subredditRepo.save(Subreddit.of("test", "title", "description", "reddit-user", Set.of("topic")))
                 .block();
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Subreddit> edited = connectTcp()
-                .flatMap(req -> req
-                        .route("edit.subreddit.{subredditName}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new EditSubreddit("new title", "new description", Set.of("topic", "another topic")))
-                        .retrieveMono(Subreddit.class));
+        Mono<Subreddit> edited = tcp()
+                .route("edit.subreddit.{subredditName}.by.{username}", "test", "reddit-user")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new EditSubreddit("new title", "new description", Set.of("topic", "another topic")))
+                .retrieveMono(Subreddit.class);
 
         StepVerifier
                 .create(edited)
@@ -362,14 +391,13 @@ public class SubredditServiceApplicationTests {
     @Test
     public void editSubreddit_whenSubredditNotFound_shouldReturnError() {
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Subreddit> edited = connectTcp()
-                .flatMap(req -> req
-                        .route("edit.subreddit.{subredditName}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new EditSubreddit("new title", "new description", Set.of("topic", "another topic")))
-                        .retrieveMono(Subreddit.class));
+        Mono<Subreddit> edited = tcp()
+                .route("edit.subreddit.{subredditName}.by.{username}", "test", "reddit-user")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new EditSubreddit("new title", "new description", Set.of("topic", "another topic")))
+                .retrieveMono(Subreddit.class);
 
         StepVerifier
                 .create(edited)
@@ -383,14 +411,13 @@ public class SubredditServiceApplicationTests {
         subredditRepo.save(Subreddit.of("test", "title", "description", "another-reddit-user", Set.of("topic")))
                 .block();
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Subreddit> edited = connectTcp()
-                .flatMap(req -> req
-                        .route("edit.subreddit.{subredditName}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .data(new EditSubreddit("new title", "new description", Set.of("topic", "another topic")))
-                        .retrieveMono(Subreddit.class));
+        Mono<Subreddit> edited = tcp()
+                .route("edit.subreddit.{subredditName}.by.{username}", "test", "reddit-user")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .data(new EditSubreddit("new title", "new description", Set.of("topic", "another topic")))
+                .retrieveMono(Subreddit.class);
 
         StepVerifier
                 .create(edited)
@@ -400,12 +427,11 @@ public class SubredditServiceApplicationTests {
     }
 
     @Test
-    public void joinSubreddit_whenNoJwt_shouldReturnError() {
+    public void addSubredditMember_whenNoJwt_shouldReturnError() {
 
-        Mono<Void> joined = connectTcp()
-                .flatMap(req -> req
-                        .route("join.subreddit.{subredditName}", "test")
-                        .retrieveMono(Void.class));
+        Mono<Void> joined = tcp()
+                .route("add.{username}.to.{subredditName}.members", "reddit-user", "test")
+                .retrieveMono(Void.class);
 
         StepVerifier
                 .create(joined)
@@ -413,7 +439,7 @@ public class SubredditServiceApplicationTests {
     }
 
     @Test
-    public void joinSubreddit_whenUserIsAlreadyAMemberOfOtherSubreddits_shouldJoinThatSubreddit() {
+    public void addSubredditMember_whenUserIsAlreadyAMemberOfOtherSubreddits_shouldJoinThatSubreddit() {
 
         memberRepo
                 .save(Member.of("reddit-user", "test1"))
@@ -423,13 +449,12 @@ public class SubredditServiceApplicationTests {
                 .save(Subreddit.of("test2", "title", "description", "another-reddit-user", Set.of("topic")))
                 .block();
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Member> joined = connectTcp()
-                .flatMap(req -> req
-                        .route("join.subreddit.{subredditName}", "test2")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Member> joined = tcp()
+                .route("add.{username}.to.{subredditName}.members", "reddit-user", "test2")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> memberRepo.findById("reddit-user")));
 
         StepVerifier
@@ -443,7 +468,7 @@ public class SubredditServiceApplicationTests {
     }
 
     @Test
-    public void joinSubreddit_whenUserIsAlreadyAMemberOfOtherSubreddits_shouldIncreaseSubredditMembersCountByOne() {
+    public void addSubredditMember_whenUserIsAlreadyAMemberOfOtherSubreddits_shouldIncreaseSubredditMembersCountByOne() {
 
         memberRepo.save(Member.of("another-reddit-user", "test2")).block();
 
@@ -457,23 +482,22 @@ public class SubredditServiceApplicationTests {
         Long previousMembersCount = subreddit.getMembers();
         Long expectedMembersCount = previousMembersCount + 1;
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Subreddit> joined = connectTcp()
-                .flatMap(req -> req
-                        .route("join.subreddit.{subredditName}", "test2")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Subreddit> joined = tcp()
+                .route("add.{username}.to.{subredditName}.members", "reddit-user", "test2")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> subredditRepo.findById("test2")));
 
         StepVerifier
                 .create(joined)
-                .expectNextMatches(it -> it.getMembers().equals(expectedMembersCount))
+                .expectNextMatches(it -> it.getMembers() == expectedMembersCount)
                 .verifyComplete();
     }
 
     @Test
-    public void joinSubreddit_whenUserIsAlreadyAMemberOfThatSubreddit_shouldReturnError() {
+    public void addSubredditMember_whenUserIsAlreadyAMemberOfThatSubreddit_shouldReturnError() {
 
         memberRepo
                 .save(Member.of("reddit-user", "test"))
@@ -483,13 +507,12 @@ public class SubredditServiceApplicationTests {
                 .save(Subreddit.of("test", "title", "description", "another-reddit-user", Set.of("topic")))
                 .block();
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Void> joined = connectTcp()
-                .flatMap(req -> req
-                        .route("join.subreddit.{subredditName}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class));
+        Mono<Void> joined = tcp()
+                .route("add.{username}.to.{subredditName}.members", "reddit-user", "test")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class);
 
         StepVerifier
                 .create(joined)
@@ -499,19 +522,18 @@ public class SubredditServiceApplicationTests {
     }
 
     @Test
-    public void joinSubreddit_whenUserIsNotAMemberOfAnySubreddits_shouldCreateMemberAndJoinSubreddit() {
+    public void addSubredditMember_whenUserIsNotAMemberOfAnySubreddits_shouldCreateMemberAndaddSubredditMember() {
 
         subredditRepo
                 .save(Subreddit.of("test", "title", "description", "another-reddit-user", Set.of("topic")))
                 .block();
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Member> joined = connectTcp()
-                .flatMap(req -> req
-                        .route("join.subreddit.{subredditName}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Member> joined = tcp()
+                .route("add.{username}.to.{subredditName}.members", "reddit-user", "test")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> memberRepo.findById("reddit-user")));
 
         StepVerifier
@@ -524,7 +546,7 @@ public class SubredditServiceApplicationTests {
     }
 
     @Test
-    public void joinSubreddit_whenUserIsNotAMemberOfAnySubreddits_shouldIncreaseSubredditMembersCountByOne() {
+    public void addSubredditMember_whenUserIsNotAMemberOfAnySubreddits_shouldIncreaseSubredditMembersCountByOne() {
 
         memberRepo.save(Member.of("another-reddit-user", "test")).block();
 
@@ -536,31 +558,29 @@ public class SubredditServiceApplicationTests {
         Long previousMembersCount = subreddit.getMembers();
         Long expectedMembersCount = previousMembersCount + 1;
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Subreddit> joined = connectTcp()
-                .flatMap(req -> req
-                        .route("join.subreddit.{subredditName}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Subreddit> joined = tcp()
+                .route("add.{username}.to.{subredditName}.members", "reddit-user", "test")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> subredditRepo.findById(subreddit.getName())));
 
         StepVerifier
                 .create(joined)
-                .expectNextMatches(it -> it.getMembers().equals(expectedMembersCount))
+                .expectNextMatches(it -> it.getMembers() == expectedMembersCount)
                 .verifyComplete();
     }
 
     @Test
-    public void joinSubreddit_whenSubredditNotFound_shouldReturnError() {
+    public void addSubredditMember_whenSubredditNotFound_shouldReturnError() {
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Void> joined = connectTcp()
-                .flatMap(req -> req
-                        .route("join.subreddit.{subredditName}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class));
+        Mono<Void> joined = tcp()
+                .route("add.{username}.to.{subredditName}.members", "reddit-user", "test")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class);
 
         StepVerifier
                 .create(joined)
@@ -569,12 +589,11 @@ public class SubredditServiceApplicationTests {
     }
 
     @Test
-    public void leaveSubreddit_whenNoJwt_shouldReturnError() {
+    public void removeSubredditMember_whenNoJwt_shouldReturnError() {
 
-        Mono<Void> left = connectTcp()
-                .flatMap(req -> req
-                        .route("leave.subreddit.{subredditName}", "test")
-                        .retrieveMono(Void.class));
+        Mono<Void> left = tcp()
+                .route("remove.{username}.from.{subredditName}.members", "reddit-user", "test")
+                .retrieveMono(Void.class);
 
         StepVerifier
                 .create(left)
@@ -582,7 +601,7 @@ public class SubredditServiceApplicationTests {
     }
 
     @Test
-    public void leaveSubreddit_whenUserIsMemberOfSubreddit_shouldLeaveThatSubreddit() {
+    public void removeSubredditMember_whenUserIsMemberOfSubreddit_shouldLeaveThatSubreddit() {
 
         memberRepo
                 .save(Member.of("reddit-user", "test"))
@@ -592,13 +611,12 @@ public class SubredditServiceApplicationTests {
                 .save(Subreddit.of("test", "title", "description", "another-reddit-user", Set.of("topic")))
                 .block();
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Member> left = connectTcp()
-                .flatMap(req -> req
-                        .route("leave.subreddit.{subredditName}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Member> left = tcp()
+                .route("remove.{username}.from.{subredditName}.members", "reddit-user", "test")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> memberRepo.findById("reddit-user")));
 
         StepVerifier
@@ -611,7 +629,7 @@ public class SubredditServiceApplicationTests {
     }
 
     @Test
-    public void leaveSubreddit_whenUserIsMemberOfSubreddit_shouldDecreaseSubredditMembersCountByOne() {
+    public void removeSubredditMember_whenUserIsMemberOfSubreddit_shouldDecreaseSubredditMembersCountByOne() {
 
         Subreddit subreddit = memberRepo
                 .save(Member.of("reddit-user", "test"))
@@ -623,23 +641,22 @@ public class SubredditServiceApplicationTests {
         Long previousMembersCount = subreddit.getMembers();
         Long expectedMembersCount = previousMembersCount - 1;
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Subreddit> left = connectTcp()
-                .flatMap(req -> req
-                        .route("leave.subreddit.{subredditName}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class))
+        Mono<Subreddit> left = tcp()
+                .route("remove.{username}.from.{subredditName}.members", "reddit-user", "test")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class)
                 .then(Mono.defer(() -> subredditRepo.findById("test")));
 
         StepVerifier
                 .create(left)
-                .expectNextMatches(it -> it.getMembers().equals(expectedMembersCount))
+                .expectNextMatches(it -> it.getMembers() == expectedMembersCount)
                 .verifyComplete();
     }
 
     @Test
-    public void leaveSubreddit_whenUserIsNotAMemberOfThatSubreddit_shouldReturnError() {
+    public void removeSubredditMember_whenUserIsNotAMemberOfThatSubreddit_shouldReturnError() {
 
         memberRepo
                 .save(Member.of("reddit-user", "test1"))
@@ -649,13 +666,12 @@ public class SubredditServiceApplicationTests {
                 .save(Subreddit.of("test2", "title", "description", "another-reddit-user", Set.of()))
                 .block();
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Void> left = connectTcp()
-                .flatMap(req -> req
-                        .route("leave.subreddit.{subredditName}", "test2")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class));
+        Mono<Void> left = tcp()
+                .route("remove.{username}.from.{subredditName}.members", "reddit-user", "test2")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class);
 
         StepVerifier
                 .create(left)
@@ -665,15 +681,14 @@ public class SubredditServiceApplicationTests {
     }
 
     @Test
-    public void leaveSubreddit_whenUserIsNotAMember_shouldReturnError() {
+    public void removeSubredditMember_whenUserIsNotAMember_shouldReturnError() {
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Void> left = connectTcp()
-                .flatMap(req -> req
-                        .route("leave.subreddit.{subredditName}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class));
+        Mono<Void> left = tcp()
+                .route("remove.{username}.from.{subredditName}.members", "reddit-user", "test")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class);
 
         StepVerifier
                 .create(left)
@@ -683,19 +698,18 @@ public class SubredditServiceApplicationTests {
     }
 
     @Test
-    public void leaveSubreddit_whenSubredditNotFound_shouldReturnError() {
+    public void removeSubredditMember_whenSubredditNotFound_shouldReturnError() {
 
         memberRepo
                 .save(Member.of("reddit-user", "test"))
                 .block();
 
-        String token = oAuth2.getAccessTokenForUsername("reddit-user", "password").block();
+        String token = oAuth2.getAccessTokenForUsername().block();
 
-        Mono<Void> left = connectTcp()
-                .flatMap(req -> req
-                        .route("leave.subreddit.{subredditName}", "test")
-                        .metadata(oAuth2.addTokenToMetadata(token))
-                        .retrieveMono(Void.class));
+        Mono<Void> left = tcp()
+                .route("remove.{username}.from.{subredditName}.members", "reddit-user", "test")
+                .metadata(oAuth2.addTokenToMetadata(token))
+                .retrieveMono(Void.class);
 
         StepVerifier
                 .create(left)
@@ -710,12 +724,10 @@ public class SubredditServiceApplicationTests {
         @Autowired
         private ReactiveClientRegistrationRepository clients;
 
-        private Mono<String> getAccessTokenForUsername(String username, String password) {
-//        var client = new WebClientReactiveClientCredentialsTokenResponseClient();
-            var client = new WebClientReactivePasswordTokenResponseClient();
+        private Mono<String> getAccessTokenForUsername() {
+            var client = new WebClientReactiveClientCredentialsTokenResponseClient();
             return clients.findByRegistrationId("keycloak")
-//                .map(OAuth2ClientCredentialsGrantRequest::new)
-                    .map(registration -> new OAuth2PasswordGrantRequest(registration, username, password))
+                    .map(OAuth2ClientCredentialsGrantRequest::new)
                     .flatMap(client::getTokenResponse)
                     .map(OAuth2AccessTokenResponse::getAccessToken)
                     .map(OAuth2AccessToken::getTokenValue);

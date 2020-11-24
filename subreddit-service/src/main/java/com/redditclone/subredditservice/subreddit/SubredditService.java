@@ -55,7 +55,7 @@ public class SubredditService {
                 .switchIfEmpty(Mono.error(new NotCreatorOfSubredditException(username, subredditName)));
     }
 
-    public Mono<Void> joinSubreddit(String subredditName, String username) {
+    public Mono<Void> addSubredditMember(String username, String subredditName) {
         return memberRepo
                 .findById(username)
                 .flatMap(member -> findSubredditByName(subredditName)
@@ -75,7 +75,7 @@ public class SubredditService {
                 .then();
     }
 
-    public Mono<Void> leaveSubreddit(String subredditName, String username) {
+    public Mono<Void> removeSubredditMember(String username, String subredditName) {
         return memberRepo
                 .findById(username)
                 .switchIfEmpty(Mono.error(new MemberNotFoundException(username)))

@@ -3,8 +3,6 @@ package com.redditclone.subredditservice.subreddit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Controller;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -25,28 +23,28 @@ public class SubredditController {
         return subredditService.findSubredditByName(subredditName);
     }
 
-    @MessageMapping("create.subreddit")
-    public Mono<Subreddit> createSubreddit(@AuthenticationPrincipal Jwt jwt,
+    @MessageMapping("create.subreddit.by.{username}")
+    public Mono<Subreddit> createSubreddit(@DestinationVariable String username,
                                            CreateSubreddit create) {
-        return subredditService.createSubreddit(jwt.getClaim("preferred_username"), create);
+        return subredditService.createSubreddit(username, create);
     }
 
-    @MessageMapping("edit.subreddit.{subredditName}")
+    @MessageMapping("edit.subreddit.{subredditName}.by.{username}")
     public Mono<Subreddit> editSubreddit(@DestinationVariable String subredditName,
-                                         @AuthenticationPrincipal Jwt jwt,
+                                         @DestinationVariable String username,
                                          EditSubreddit edit) {
-        return subredditService.editSubreddit(subredditName, jwt.getClaim("preferred_username"), edit);
+        return subredditService.editSubreddit(subredditName, username, edit);
     }
 
-    @MessageMapping("join.subreddit.{subredditName}")
-    public Mono<Void> joinSubreddit(@DestinationVariable String subredditName,
-                                    @AuthenticationPrincipal Jwt jwt) {
-        return subredditService.joinSubreddit(subredditName, jwt.getClaim("preferred_username"));
+    @MessageMapping("add.{username}.to.{subredditName}.members")
+    public Mono<Void> addSubredditMember(@DestinationVariable String username,
+                                         @DestinationVariable String subredditName) {
+        return subredditService.addSubredditMember(username, subredditName);
     }
 
-    @MessageMapping("leave.subreddit.{subredditName}")
-    public Mono<Void> leaveSubreddit(@DestinationVariable String subredditName,
-                                     @AuthenticationPrincipal Jwt jwt) {
-        return subredditService.leaveSubreddit(subredditName, jwt.getClaim("preferred_username"));
+    @MessageMapping("remove.{username}.from.{subredditName}.members")
+    public Mono<Void> removeSubredditMember(@DestinationVariable String username,
+                                            @DestinationVariable String subredditName) {
+        return subredditService.removeSubredditMember(username, subredditName);
     }
 }
